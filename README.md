@@ -1,5 +1,5 @@
-# Amortized Prompt: Lightweight fine-tuning CLIP for Domain Generalization
-This code is the official implementation of `Amortized Prompt: Lightweight fine-tuning CLIP for Domain Generalization`
+# -- under review
+This code is the official implementation of `under review`
 
 This code is based on the official implementation of `Test-Time Classifier Adjustment Module for Model-Agnostic Domain Generalization (NIPS2021)`. 
 
