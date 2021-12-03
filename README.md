@@ -18,6 +18,7 @@ Architecture for (a) Empirical Risk Minimization (ERM) fine-tuning from prior wo
 
 ## -- Results --
 ![appeal_fig](https://user-images.githubusercontent.com/49514261/144588371-d2389d3e-feaf-49af-a530-3028e7f3adda.png)
+
 The average performance on four DG datasets, VLCS, PACS, OfficeHome, TerraIncognita. We select Empirical Risk Minimization (ERM) as a baselines due to its good performance. We surprisingly find that CLIP(ViT-B16) without any fine-tuning also can outperforms ERM baselines which fine-tune on source domains. Moreover, we demonstrate our AP effectively improves the performance of CLIP and outperforms the baseline ERM with ViT-B16 as a backbone by a large margin (8.3%). Since the choice of backbones is critical to ERM in DG, we propose to use CLIP with AP as the basic component. 
 
 ![image](https://user-images.githubusercontent.com/49514261/144588234-8764e615-d4ec-4aa4-841c-04f2f1c599fc.png)
