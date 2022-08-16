@@ -1,2 +1,3 @@
 *.pyc
 domainbed/__pycache__/
+results/
