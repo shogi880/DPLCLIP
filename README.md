@@ -22,7 +22,7 @@ python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
 Note: change `--dataset pacs` for downloading other datasets (e.g., `vlcs`, `office_home`, `terra_incognita`). 
 
 
-#### (2) Table 1, 2 & 4: Domain Generalization & Test-Time Adaptation Experiment.
+#### (2) Table 1, 2, 3 & 4: Domain Generalization & Test-Time Adaptation Experiment.
 ```sh
 
 python domainbed/scripts/sweep.py delete_incomplete --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
