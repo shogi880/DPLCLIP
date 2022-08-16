@@ -10,8 +10,7 @@ import subprocess
 import time
 import torch
 
-import subprocess
-import json
+momery = 3000
 
 def local_launcher(commands):
     """Launch commands serially on the local machine."""
@@ -32,6 +31,7 @@ def multi_gpu_launcher(commands):
     """
     print('WARNING: using experimental multi_gpu_launcher.')
     
+
     DEFAULT_ATTRIBUTES = (
         'index',
         'memory.free',
@@ -52,7 +52,7 @@ def multi_gpu_launcher(commands):
 
     gpu_list = []
     for info in gpu_info:
-        if int(info['memory.free']) > 10000:
+        if int(info['memory.free']) > momery:
             gpu_list.append(int(info['index']))
     print('GPU: ', gpu_list)
     
@@ -73,60 +73,27 @@ def multi_gpu_launcher(commands):
     for p in procs_by_gpu:
         if p is not None:
             p.wait()
-            
-def single_gpu_launcher(commands):
-    """
-    Launch commands on the local machine, using all GPUs in parallel.
-    """
-    print('WARNING: using experimental multi_gpu_launcher.')
+    # n_gpus = torch.cuda.device_count()
+    # procs_by_gpu = [None]*n_gpus
+
+    # while len(commands) > 0:
+    #     for gpu_idx in range(n_gpus):
+    #         proc = procs_by_gpu[gpu_idx]
+    #         if (proc is None) or (proc.poll() is not None):
+    #             # Nothing is running on this GPU; launch a command.
+    #             cmd = commands.pop(0)
+    #             new_proc = subprocess.Popen(
+    #                 f'CUDA_VISIBLE_DEVICES={gpu_idx} {cmd}', shell=True)
+    #             procs_by_gpu[gpu_idx] = new_proc
+    #             break
+    #     time.sleep(1)
+
     
-    DEFAULT_ATTRIBUTES = (
-        'index',
-        'memory.free',
-    )
-
-    def get_gpu_info(nvidia_smi_path='nvidia-smi', keys=DEFAULT_ATTRIBUTES, no_units=True):
-        nu_opt = '' if not no_units else ',nounits'
-        cmd = '%s --query-gpu=%s --format=csv,noheader%s' % (nvidia_smi_path, ','.join(keys), nu_opt)
-        output = subprocess.check_output(cmd, shell=True)
-        lines = output.decode().split('\n')
-        lines = [ line.strip() for line in lines if line.strip() != '' ]
-
-        return [ { k: v for k, v in zip(keys, line.split(', ')) } for line in lines ]
-    gpu_info = get_gpu_info()
-
-    procs_by_gpu = [None]
-
-    gpu_list = []
-    for info in gpu_info:
-        if int(info['memory.free']) > 10000:
-            gpu_list.append(int(info['index']))
-            print(gpu_list)
-    print('GPU: ', gpu_list)
-    
-    while len(commands) > 0:
-        gpu_idx = gpu_list[0]
-        # to address out of gpu memory error.
-        proc = procs_by_gpu[gpu_idx]
-        if (proc is None) or (proc.poll() is not None):
-            # Nothing is running on this GPU; launch a command.
-            cmd = commands.pop(0)
-            new_proc = subprocess.Popen(
-                f'CUDA_VISIBLE_DEVICES={gpu_idx} {cmd}', shell=True)
-            procs_by_gpu[gpu_idx] = new_proc
-            break
-        time.sleep(1)
-
-    # Wait for the last few tasks to finish before returning
-    for p in procs_by_gpu:
-        if p is not None:
-            p.wait()
 
 REGISTRY = {
     'local': local_launcher,
     'dummy': dummy_launcher,
-    'multi_gpu': multi_gpu_launcher,
-    'single_gpu': single_gpu_launcher
+    'multi_gpu': multi_gpu_launcher
 }
 
 try:

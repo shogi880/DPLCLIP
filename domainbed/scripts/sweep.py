@@ -39,7 +39,7 @@ class Job:
 
         self.train_args = copy.deepcopy(train_args)
         self.train_args['output_dir'] = self.output_dir
-        command = ['python', '-m', 'domainbed.scripts.train']
+        command = ['OMP_NUM_THREADS=1', 'python', '-m', 'domainbed.scripts.train']
         for k, v in sorted(self.train_args.items()):
             if isinstance(v, list):
                 v = ' '.join([str(v_) for v_ in v])
@@ -217,72 +217,39 @@ def all_test_env_combinations(n):
     assert(n >= 3)
     for i in range(n):
         yield [i]
-        for j in range(i + 1, n):
+        for j in range(i+1, n):
             yield [i, j]
 
-def make_args_list(trial_seed, dataset_names, algorithms, n_hparams_from, n_hparams, steps,
-    data_dir, task, holdout_fraction, test_envs, hparams):
-    # args_list = []
-    # for trial_seed in range(n_trials_from, n_trials_from+n_trials):
-    #     for dataset in dataset_names:
-    #         for algorithm in algorithms:
-    #             if single_test_envs:
-    #                 all_test_envs = [
-    #                     [i] for i in range(datasets.num_environments(dataset))]
-    #             else:
-    #                 all_test_envs = all_test_env_combinations(
-    #                     datasets.num_environments(dataset))
-    #             for test_envs in all_test_envs:
-    #                 for hparams_seed in range(n_hparams_from, n_hparams):
-    #                     train_args = {}
-    #                     train_args['dataset'] = dataset
-    #                     train_args['algorithm'] = algorithm
-    #                     train_args['test_envs'] = test_envs
-    #                     train_args['holdout_fraction'] = holdout_fraction
-    #                     train_args['hparams_seed'] = hparams_seed
-    #                     train_args['data_dir'] = data_dir
-    #                     train_args['task'] = task
-    #                     train_args['trial_seed'] = trial_seed
-    #                     train_args['seed'] = misc.seed_hash(dataset,
-    #                         algorithm, test_envs, hparams_seed, trial_seed)
-    #                     if steps is not None:
-    #                         train_args['steps'] = steps
-    #                     if hparams is not None:
-    #                         train_args['hparams'] = hparams
-    #                     args_list.append(train_args)
-    seeds = {}
-    
-                        
+def make_args_list(n_trials_from, n_trials, dataset_names, algorithms, n_hparams_from, n_hparams, steps,
+    data_dir, task, holdout_fraction, single_test_envs, hparams):
     args_list = []
-    for algorithm in algorithms:
-        file = f'./{algorithm}_results_iid.jsonl'
-        with open(file, 'r') as f:
-            for line in f:
-                l = json.loads(line)
-                seeds[l['args']['seed']] = 1
+    for trial_seed in range(n_trials_from, n_trials_from+n_trials):
         for dataset in dataset_names:
-            for hparams_seed in range(n_hparams_from, n_hparams):
-                train_args = {}
-                train_args['dataset'] = dataset
-                train_args['algorithm'] = algorithm
-                train_args['test_envs'] = test_envs
-                train_args['holdout_fraction'] = holdout_fraction
-                train_args['hparams_seed'] = hparams_seed
-                train_args['data_dir'] = data_dir
-                train_args['task'] = task
-                train_args['trial_seed'] = trial_seed
-                train_args['seed'] = misc.seed_hash(dataset,
-                    algorithm, test_envs, hparams_seed, trial_seed)
-                if steps is not None:
-                    train_args['steps'] = steps
-                if hparams is not None:
-                    train_args['hparams'] = hparams
-                
-                if seeds.get(train_args['seed']) is not None:
-                    print(train_args['seed'])
-                else:        
-                    print(train_args['hparams_seed'])
-                    args_list.append(train_args)
+            for algorithm in algorithms:
+                if single_test_envs:
+                    all_test_envs = [
+                        [i] for i in range(datasets.num_environments(dataset))]
+                else:
+                    all_test_envs = all_test_env_combinations(
+                        datasets.num_environments(dataset))
+                for test_envs in all_test_envs:
+                    for hparams_seed in range(n_hparams_from, n_hparams):
+                        train_args = {}
+                        train_args['dataset'] = dataset
+                        train_args['algorithm'] = algorithm
+                        train_args['test_envs'] = test_envs
+                        train_args['holdout_fraction'] = holdout_fraction
+                        train_args['hparams_seed'] = hparams_seed
+                        train_args['data_dir'] = data_dir
+                        train_args['task'] = task
+                        train_args['trial_seed'] = trial_seed
+                        train_args['seed'] = misc.seed_hash(dataset,
+                            algorithm, test_envs, hparams_seed, trial_seed)
+                        if steps is not None:
+                            train_args['steps'] = steps
+                        if hparams is not None:
+                            train_args['hparams'] = hparams
+                        args_list.append(train_args)
     return args_list
 
 def ask_for_confirmation():
@@ -301,7 +268,7 @@ if __name__ == "__main__":
     parser.add_argument('--datasets', nargs='+', type=str, default=DATASETS)
     parser.add_argument('--algorithms', nargs='+', type=str, default=algorithms.ALGORITHMS)
     parser.add_argument('--task', type=str, default="domain_generalization")
-    parser.add_argument('--n_hparams_from', type=int, default=0)
+    parser.add_argument('--n_hparams_from', type=int, required=True)
     parser.add_argument('--n_hparams', type=int, default=20)
     parser.add_argument('--output_dir', type=str, required=True)
     parser.add_argument('--data_dir', type=str, required=True)
@@ -314,13 +281,11 @@ if __name__ == "__main__":
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--single_test_envs', action='store_true')
     parser.add_argument('--skip_confirmation', action='store_true')
-    # new added in DPCLIP.
-    parser.add_argument('--test_envs', type=int, required=True)
-    parser.add_argument('--trial_seed', type=int, default=0)
     args = parser.parse_args()
 
     args_list = make_args_list(
-        trial_seed=args.trial_seed,
+        n_trials_from=args.n_trials_from, 
+        n_trials=args.n_trials,
         dataset_names=args.datasets,
         algorithms=args.algorithms,
         n_hparams_from=args.n_hparams_from,
@@ -329,8 +294,7 @@ if __name__ == "__main__":
         data_dir=args.data_dir,
         task=args.task,
         holdout_fraction=args.holdout_fraction,
-        # single_test_envs=args.single_test_envs,
-        test_envs=args.test_envs,
+        single_test_envs=args.single_test_envs,
         hparams=args.hparams
     )
 
@@ -386,22 +350,29 @@ if __name__ == "__main__":
 
     elif args.command in ['unsupervised_adaptation', 'unsup_adapt']:
         methods = [
-            'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-            'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM'
-            ]
+            'T3A',
+            'SHOT', 'PseudoLabel'
+            'TentClf', 'SHOTIM', 'PLClf',
+            # 'PseudoLabel',  'SHOT', 'TentPreBN', 
+            # 'TentNorm',  'TentFull'
+        ]
+        # methods = [
+        #     'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
+        #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM'
+        #     ]
         jobs = []
         for method in methods:
             jobs += [UAJob(
                 train_args, args.output_dir,
-                adapt_algorithm=method) for train_args in args_list]
-            jobs += [UAJob(
-                train_args, args.output_dir,
-                adapt_algorithm='{}-{}'.format(method, '8'))
+                adapt_algorithm='{}-{}'.format(method, '64'))  # set to the same as DPLCLIP. 
                 for train_args in args_list]
-            jobs += [UAJob(
-                train_args, args.output_dir,
-                adapt_algorithm='{}-{}'.format(method, '200'))
-                for train_args in args_list]
+            # jobs += [UAJob(
+            #     train_args, args.output_dir,
+            #     adapt_algorithm=method) for train_args in args_list]
+            # jobs += [UAJob(
+            #     train_args, args.output_dir,
+            #     adapt_algorithm='{}-{}'.format(method, '200'))
+            #     for train_args in args_list]
 
         for job in jobs:
             print(job)

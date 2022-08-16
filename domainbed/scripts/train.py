@@ -1,4 +1,5 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+
 import argparse
 import collections
 import json
@@ -7,7 +8,6 @@ import random
 import sys
 import time
 import uuid
-import wandb
 from itertools import chain
 
 import numpy as np
@@ -27,10 +27,10 @@ from domainbed.lib.query import Q
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Domain generalization')
-    parser.add_argument('--data_dir', type=str, default='/home/acc12252dc/datasets')
-    parser.add_argument('--dataset', type=str, default='TerraIncognita')
-    parser.add_argument('--algorithm', type=str, default='DPCLIP')
-    parser.add_argument('--task', type=str, default='domain_generalization',
+    parser.add_argument('--data_dir', type=str)
+    parser.add_argument('--dataset', type=str, default="RotatedMNIST")
+    parser.add_argument('--algorithm', type=str, default="ERM")
+    parser.add_argument('--task', type=str, default="domain_generalization",
         help='domain_generalization | domain_adaptation')
     parser.add_argument('--hparams', type=str,
         help='JSON-serialized hparams dict')
@@ -45,33 +45,26 @@ if __name__ == "__main__":
         help='Number of steps. Default is dataset-dependent.')
     parser.add_argument('--checkpoint_freq', type=int, default=None,
         help='Checkpoint every N steps. Default is dataset-dependent.')
-    parser.add_argument('--test_envs', type=int, nargs='+', default=[3])
-    parser.add_argument('--output_dir', type=str, default='/home/acc12252dc/results')
+    parser.add_argument('--test_envs', type=int, nargs='+', default=[0])
+    parser.add_argument('--output_dir', type=str, default="train_output")
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
     parser.add_argument('--uda_holdout_fraction', type=float, default=0)
     parser.add_argument('--skip_model_save', action='store_true')
     parser.add_argument('--save_model_every_checkpoint', action='store_true')
-    parser.add_argument('--cpu_num_threads', type=int, default=4)
     
-    #  to registry on wandb.
-    parser.add_argument('--num_domain_tokens', type=int, default=16)
-    parser.add_argument('--gamma', type=float, default=0.5)
-    parser.add_argument('--beta', type=float, default=0.5)
-    # MLP
-    parser.add_argument('--mlp_depth', type=int, default=3)
-    parser.add_argument('--mlp_width', type=int, default=512)
-    parser.add_argument('--mlp_dropout', type=float, default=0.1)
-    # optimizer
-    parser.add_argument('--lr', type=float, default=0.001)
-    
-    # DANNCLIP
-    parser.add_argument('--prompt_classifier', action='store_true')
+    # parser.add_argument('--clip_backbone', type=str, default="None")
     args = parser.parse_args()
+
     # If we ever want to implement checkpointing, just persist these values
-    # every once in a while, and then load them from disk here. 
+    # every once in a while, and then load them from disk here.
     start_step = 0
     algorithm_dict = None
-    print(torch.get_num_threads())
+
+    os.makedirs(args.output_dir, exist_ok=True)
+    print(args.output_dir)
+    sys.stdout = misc.Tee(os.path.join(args.output_dir, 'out.txt'))
+    sys.stderr = misc.Tee(os.path.join(args.output_dir, 'err.txt'))
+    # sys.stderr = misc.Tee(os.path.join(args.output_dir, 'results.jsonl'))
 
     print("Environment:")
     print("\tPython: {}".format(sys.version.split(" ")[0]))
@@ -81,7 +74,7 @@ if __name__ == "__main__":
     print("\tCUDNN: {}".format(torch.backends.cudnn.version()))
     print("\tNumPy: {}".format(np.__version__))
     print("\tPIL: {}".format(PIL.__version__))
-    print("\tCPU_Num_Threads: {}".format(args.cpu_num_threads))
+
     print('Args:')
     for k, v in sorted(vars(args).items()):
         print('\t{}: {}'.format(k, v))
@@ -92,37 +85,23 @@ if __name__ == "__main__":
         hparams = hparams_registry.random_hparams(args.algorithm, args.dataset,
             misc.seed_hash(args.hparams_seed, args.trial_seed))
     if args.hparams:
-        with open(args.hparams) as f:
-            hparams.update(json.load(f))
-            # _haprams = json.loads(f)
-    
-    hparams['use_clip'] = False
-    hparams['clip_transform'] = False
-    hparams['prompt_classifier'] = args.prompt_classifier
+        hparams.update(json.loads(args.hparams))
+
     hparams['test_envs'] = [int(i) for i in args.test_envs]
-    
-    if args.algorithm in ['CLIP', 'DomainCLIP', 'DPCLIP', 'DPICLIP', 'APCLIP', 'CoOp', 'ERMDPCLIP', 'UDGCLIP', 'DANNCLIP']:
-        hparams['backbone'] = 'ViT-B/16'
-        hparams['use_clip'] = True
-        hparams['clip_transform'] = True
-        
-        hparams['num_domain_tokens'] = args.num_domain_tokens
-        # DP-CLIP loss.
-        hparams['gamma'] = args.gamma
-        hparams['beta'] = args.beta
-        # MLP.
-        hparams['mlp_depth'] = args.mlp_depth
-        hparams['mlp_width'] = args.mlp_width
-        hparams['mlp_dropout'] = args.mlp_dropout
-        # optimizer SGD (CLIP)
-        hparams['lr'] = args.lr
-        
+
+    # "RN50",
+    # "RN101",
+    # "RN50x4",
+    # "RN50x16",
+    # "RN50x64",
+    # "ViT-B/32",
+    # "ViT-B/16",
+    # "ViT-L/14",
+    hparams['clip_transform'] = hparams['backbone'] == 'clip'
+
     print('HParams:')
     for k, v in sorted(hparams.items()):
         print('\t{}: {}'.format(k, v))
-
-    wandb.init(settings=wandb.Settings(start_method='thread'), project='DPCLIP', name=f'{args.dataset}-{args.test_envs}-{args.algorithm}', entity='weblab-iwasawa', config=args)
-    wandb.config.update(hparams, allow_val_change=True)
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -136,26 +115,35 @@ if __name__ == "__main__":
         device = "cpu"
 
     if args.dataset in vars(datasets):
-        dataset = vars(datasets)[args.dataset](args.data_dir,
-            args.test_envs, hparams)
+        dataset = vars(datasets)[args.dataset](args.data_dir, args.test_envs, hparams)
     else:
         raise NotImplementedError
-    
+
     # Split each env into an 'in-split' and an 'out-split'. We'll train on
     # each in-split except the test envs, and evaluate on all splits.
-
+    
+    # To allow unsupervised domain adaptation experiments, we split each test
+    # env into 'in-split', 'uda-split' and 'out-split'. The 'in-split' is used
+    # by collect_results.py to compute classification accuracies.  The
+    # 'out-split' is used by the Oracle model selectino method. The unlabeled
+    # samples in 'uda-split' are passed to the algorithm at training time if
+    # args.task == "domain_adaptation". If we are interested in comparing
+    # domain generalization and domain adaptation results, then domain
+    # generalization algorithms should create the same 'uda-splits', which will
+    # be discared at training.
     in_splits = []
     out_splits = []
     uda_splits = []
     for env_i, env in enumerate(dataset):
         uda = []
+
         out, in_ = misc.split_dataset(env,
             int(len(env) * args.holdout_fraction),
             misc.seed_hash(args.trial_seed, env_i))
-        
+
         if env_i in args.test_envs:
             uda, in_ = misc.split_dataset(in_,
-                int(len(in_) * args.uda_holdout_fraction),
+                int(len(in_)*args.uda_holdout_fraction),
                 misc.seed_hash(args.trial_seed, env_i))
 
         if hparams['class_balanced']:
@@ -168,7 +156,7 @@ if __name__ == "__main__":
         in_splits.append((in_, in_weights))
         out_splits.append((out, out_weights))
         if len(uda):
-            uda_splits.append((uda, uda_weights)) 
+            uda_splits.append((uda, uda_weights))
 
     train_loaders = [InfiniteDataLoader(
         dataset=env,
@@ -193,27 +181,15 @@ if __name__ == "__main__":
         for env, _ in (in_splits + out_splits + uda_splits)]
     eval_weights = [None for _, weights in (in_splits + out_splits + uda_splits)]
     eval_loader_names = ['env{}_in'.format(i)
-                          for i in range(len(in_splits))]
+        for i in range(len(in_splits))]
     eval_loader_names += ['env{}_out'.format(i)
-                          for i in range(len(out_splits))]
+        for i in range(len(out_splits))]
     eval_loader_names += ['env{}_uda'.format(i)
-                          for i in range(len(uda_splits))]
+        for i in range(len(uda_splits))]
 
     algorithm_class = algorithms.get_algorithm_class(args.algorithm)
     algorithm = algorithm_class(dataset.input_shape, dataset.num_classes,
-                                len(dataset) - len(args.test_envs), hparams)
-
-    # if args.algorithm in ['DPCLIP', 'CLCLIP', 'CoOp',]:
-    #     algorithm_name = f'{args.algorithm}-prompt{hparams["num_domain_tokens"]}-gamma{hparams["gamma"]}-beta{hparams["beta"]}-depth{hparams["mlp_depth"]}-width{hparams["mlp_width"]}-dropout{hparams["mlp_dropout"]}-lr{hparams["lr"]}-momentum{hparams["momentum"]}-weight_decay{hparams["weight_decay"]}'
-    # else:
-    dataset_name = f'{args.algorithm}-{args.dataset}-test{args.test_envs[0]}-trail{args.trial_seed}'
-    args.output_dir = os.path.join(args.output_dir, dataset_name)
-    print("args.output_dir: ", args.output_dir)
-    os.makedirs(args.output_dir, exist_ok=True)
-    # with open(os.path.join(args.output_dir, 'params.json'), mode="w") as f:
-    #     json.dump(hparams, f, indent=4)
-    sys.stdout = misc.Tee(os.path.join(args.output_dir, 'out.txt'))
-    sys.stderr = misc.Tee(os.path.join(args.output_dir, 'err.txt'))
+        len(dataset) - len(args.test_envs), hparams)
 
     if algorithm_dict is not None:
         algorithm.load_state_dict(algorithm_dict)
@@ -224,21 +200,24 @@ if __name__ == "__main__":
     else:
         for m in algorithm.children():
             m = DataParallelPassthrough(m)
-    
+
     train_minibatches_iterator = zip(*train_loaders)
     uda_minibatches_iterator = zip(*uda_loaders)
     checkpoint_vals = collections.defaultdict(lambda: [])
 
-    steps_per_epoch = min([len(env) / hparams['batch_size'] for env, _ in in_splits])
+    steps_per_epoch = min([len(env)/hparams['batch_size'] for env,_ in in_splits])
 
-    # if args.algorithm in ['CLIP', 'DomainCLIP']:
-    #     args.steps = 1
+    if args.algorithm in ["WordCLIP", "CLIP"]:
+        print('Setting step to 1...')
+        args.steps = 1  # do not learn anything.
+
     n_steps = args.steps or dataset.N_STEPS
     checkpoint_freq = args.checkpoint_freq or dataset.CHECKPOINT_FREQ
 
+    # TODO:
+    args.skip_model_save = True
     def save_checkpoint(filename):
-        # if args.skip_model_save:
-        if True:  # skip.
+        if args.skip_model_save:
             return
         save_dict = {
             "args": vars(args),
@@ -250,15 +229,15 @@ if __name__ == "__main__":
         }
         torch.save(save_dict, os.path.join(args.output_dir, filename))
 
+
     last_results_keys = None
-    
-    # n_steps = 1000  # to debug.
-    iid_best_acc = 0
     for step in range(start_step, n_steps):
         step_start_time = time.time()
-        minibatches_device = [(x.to(device), y.to(device)) for x, y in next(train_minibatches_iterator)]
+        minibatches_device = [(x.to(device), y.to(device))
+            for x,y in next(train_minibatches_iterator)]
         if args.task == "domain_adaptation":
-            uda_device = [x.to(device) for x, _ in next(uda_minibatches_iterator)]
+            uda_device = [x.to(device)
+                for x,_ in next(uda_minibatches_iterator)]
         else:
             uda_device = None
         step_vals = algorithm.update(minibatches_device, uda_device)
@@ -275,25 +254,26 @@ if __name__ == "__main__":
 
             for key, val in checkpoint_vals.items():
                 results[key] = np.mean(val)
-                wandb.log({key: np.mean(val)})
-            
+
             evals = zip(eval_loader_names, eval_loaders, eval_weights)
             for name, loader, weights in evals:
                 acc = misc.accuracy(algorithm, loader, weights, device)
-                results[name + '_acc'] = acc
+                results[name+'_acc'] = acc
 
             results_keys = sorted(results.keys())
             if results_keys != last_results_keys:
                 misc.print_row(results_keys, colwidth=12)
                 last_results_keys = results_keys
-            misc.print_row([results[key] for key in results_keys], colwidth=12)
+            misc.print_row([results[key] for key in results_keys],
+                colwidth=12)
 
             results.update({
                 'hparams': hparams,
-                'args': vars(args)
+                'args': vars(args)    
             })
 
             epochs_path = os.path.join(args.output_dir, 'results.jsonl')
+
             with open(epochs_path, 'a') as f:
                 f.write(json.dumps(results, sort_keys=True) + "\n")
 
@@ -307,29 +287,13 @@ if __name__ == "__main__":
                     records.append(json.loads(line[:-1]))
             records = Q(records)
             scores = records.map(model_selection.IIDAccuracySelectionMethod._step_acc)
-            if args.steps == 1:
-                print("iid_best_acc: ", scores[-1]["test_acc"])
-                wandb.log({"iid_best_acc": scores[-1]["test_acc"], "val_acc": scores[-1]["val_acc"]})
-                
             if scores[-1] == scores.argmax('val_acc'):
-                iid_best_acc = scores[-1]["test_acc"]
                 save_checkpoint('IID_best.pkl')
                 algorithm.to(device)
             
-            wandb.log({"iid_best_acc": iid_best_acc, "val_acc": scores[-1]["val_acc"]})
-            
             if args.save_model_every_checkpoint:
-                save_checkpoint(f'model_step{step}.pkl')
-                
-    # save_checkpoint('model.pkl')
+                save_checkpoint(f'model_step{step}.pkl')          
+    save_checkpoint('model.pkl')
 
-    iid_results = {
-                'hparams': hparams,
-                'args': vars(args),
-                'acc_iid_best': iid_best_acc
-    }
-    with open(f'./{args.algorithm}_results_iid.jsonl', 'a') as f:
-        f.write(json.dumps(iid_results, sort_keys=True) + "\n")
-                
     with open(os.path.join(args.output_dir, 'done'), 'w') as f:
         f.write('done')

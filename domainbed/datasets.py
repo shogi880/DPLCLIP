@@ -22,11 +22,10 @@ DATASETS = [
     "ColoredMNIST",
     "RotatedMNIST",
     # Big images
-    "VLCS",  # s1, w1
-    "PACS",  # s7
-    "PACSFeature"
-    "OfficeHome",  # s4
-    "TerraIncognita",  # s8
+    "VLCS",
+    "PACS",
+    "OfficeHome",
+    "TerraIncognita",
     "DomainNet",
     "SVIRO",
     # WILDS datasets
@@ -187,17 +186,17 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
         super().__init__()
         environments = [f.name for f in os.scandir(root) if f.is_dir()]
         environments = sorted(environments)
-
         hparams['domain_name'] = environments
         class_names = [f.name for f in os.scandir(os.path.join(root, environments[0])) if f.is_dir()]
         hparams['class_names'] = sorted(class_names)
+
         transform = transforms.Compose([
             transforms.Resize((224,224)),
             transforms.ToTensor(),
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
         ])
-        
+
         augment_transform = transforms.Compose([
             # transforms.Resize((224,224)),
             transforms.RandomResizedCrop(224, scale=(0.7, 1.0)),
@@ -208,20 +207,19 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
             transforms.Normalize(
                 mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
         ])
-        
+
         if hparams['clip_transform']:
             import clip
-            assert hparams['backbone'] == 'ViT-B/16'
-            _, clip_transform = clip.load(hparams['backbone'])
+            print('Using clip_transform', hparams['clip_backbone'])
+            clip_transform = clip.load(hparams['clip_backbone'])[1]
 
         self.datasets = []
         for i, environment in enumerate(environments):
             if hparams['clip_transform']:
                 env_transform = clip_transform
-                
+            
             elif augment and (i not in test_envs):
                 env_transform = augment_transform
-                
             else:
                 env_transform = transform
 
@@ -230,10 +228,9 @@ class MultipleEnvironmentImageFolder(MultipleDomainDataset):
                 transform=env_transform)
 
             self.datasets.append(env_dataset)
-        
+
         self.input_shape = (3, 224, 224,)
         self.num_classes = len(self.datasets[-1].classes)
-
 
 class VLCS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
@@ -242,66 +239,6 @@ class VLCS(MultipleEnvironmentImageFolder):
         self.dir = os.path.join(root, "VLCS/")
         super().__init__(self.dir, test_envs, hparams['data_augmentation'], hparams)
 
-class FeatureDataset(MultipleDomainDataset):
-    """
-    Wanted to read image feature instead encoding every time.
-    But image encoding only takes 5% times, for example 0.016sec/0.4sec(image/total) per step.
-    So skipped.
-    """
-    def __init__(self, root, hparams):
-        super().__init__()
-        environments = [f.name for f in os.scandir(root) if f.is_dir()]
-        environments = sorted(environments)
-        hparams['domain_name'] = environments
-        class_names = [f.name for f in os.scandir(os.path.join(root, environments[0])) if f.is_dir()]
-        hparams['class_names'] = sorted(class_names)
-        
-        import clip
-        _, clip_transform = clip.load(hparams['backbone'])
-        
-        self.datasets = []
-        for i, environment in enumerate(environments):
-            path = os.path.join(root, environment)
-            env_dataset = ImageFolder(path,
-                                      transform=clip_transform)
-
-            self.datasets.append(env_dataset)
-        
-            import ipdb; ipdb.set_trace()
-            
-        # 1. read image and label.
-        # 2. transform image.
-        # 3. save feautre.
-        
-        # feature_list = []
-        # label_list = []
-        
-        # feature = clip_model.visual(data)
-        # feature = feature.cpu()
-        # for idx in range(len(data)):
-            # feature_list.append(feature[idx].tolist())
-        # label_list.extend(batch["label"].tolist())
-        
-        # save_dir = os.path.join(cfg.OUTPUT_DIR, cfg.DATASET.NAME)
-        # os.makedirs(save_dir, exist_ok=True)
-        # save_filename = f"{args.split}"
-        # np.savez(
-        #     os.path.join(save_dir, save_filename),
-        #     feature_list=feature_list,
-        #     label_list=label_list,
-        # )
-        
-        self.input_shape = (3, 224, 224,)
-        self.num_classes = len(self.datasets[-1].classes)
-        
-class PACSFeature(FeatureDataset):
-    CHECKPOINT_FREQ = 300
-    ENVIRONMENTS = ["A", "C", "P", "S"]
-    def __init__(self, root, test_envs, hparams):
-        self.dir = os.path.join(root, "PACS/")
-        super().__init__(self.dir, hparams)
-            
-    
 class PACS(MultipleEnvironmentImageFolder):
     CHECKPOINT_FREQ = 300
     ENVIRONMENTS = ["A", "C", "P", "S"]

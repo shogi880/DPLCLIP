@@ -1,26 +1,185 @@
-This code is the official implementation of `Amortized Pormpt: Lightweight Fine-Tuning CLIP in Domain Generalizaiton`
+# Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains
 
-<!-- This code is based on the official implementation of `Test-Time Classifier Adjustment Module for Model-Agnostic Domain Generalization (NIPS2021)`.  -->
+This codebase is the official implementation of `Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains`.
+This codebase is based on [T3A] [url](<https://openreview.net/forum?id=e_yvNqkJKAW&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DNeurIPS.cc%2F2021%2FConference%2FAuthors%23your-submissions)>). 
+and [DomainBed] (https://github.com/facebookresearch/DomainBed).
 
-<!-- This codebase is mainly based on [DomainBed](https://github.com/facebookresearch/DomainBed), with following modifications: -->
+## Installation
 
-## -- Concet --
-![concept](https://user-images.githubusercontent.com/49514261/144587743-9fc28c90-c6d6-4d67-9e3b-02d412c693d0.png)
-The conceptual difference between (a) Standard DG methods that using ResNet18 or ResNet50 as a backbone and (b) Foundation
-Model such as CLIP. The most of standard DG methods (a) explicit/implicit conduct domain alignment to learn domain-invariant repre-
-sentation or add samples/regularization to avoid overfitting on source domains. In this work, we propose (b) to utilize Foundation Model
-that includes more effective representation for adaption to a target domain
+#### Python libralies
 
-## -- Architecture --
-![architecture](https://user-images.githubusercontent.com/49514261/144587733-010b67b2-b4b3-41e3-876b-1587ef8ba9b7.png)
+```sh
+python3 -m venv ~/venv/dplclip
+source ~/venv/dplclip/bin/activate
+pip install -r requirements.txt
+```
 
-Architecture for (a) Empirical Risk Minimization (ERM) fine-tuning from prior works, (b) naive CLIP without fine-tuning, and (c) CLIP + AP. Gray boxes are fixed networks during learning, while blue boxes are the learned components. Instead of intervening through directly on back-bone vision network representations as in (a) ERM, our (c) CLIP + AP intervenes through prompt generation in language representation, passed through the backbone language network
+#### (1) Downlload the datasets
 
-## -- Results --
-![appeal_fig](https://user-images.githubusercontent.com/49514261/144588371-d2389d3e-feaf-49af-a530-3028e7f3adda.png)
+```sh
+python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
+```
+Note: change `--dataset pacs` for downloading other datasets (e.g., `vlcs`, `office_home`, `terra_incognita`). 
 
-The average performance on four DG datasets, VLCS, PACS, OfficeHome, TerraIncognita. We select Empirical Risk Minimization (ERM) as a baselines due to its good performance. We surprisingly find that CLIP(ViT-B16) without any fine-tuning also can outperforms ERM baselines which fine-tune on source domains. Moreover, we demonstrate our AP effectively improves the performance of CLIP and outperforms the baseline ERM with ViT-B16 as a backbone by a large margin (8.3%). Since the choice of backbones is critical to ERM in DG, we propose to use CLIP with AP as the basic component. 
 
-![image](https://user-images.githubusercontent.com/49514261/144588234-8764e615-d4ec-4aa4-841c-04f2f1c599fc.png)
+#### (2) Table 1, 2 & 3: Domain Generalization & Test-Time Adaptation Experiment.
+```sh
 
-Detailed results on VLCS, PACS, OfficeHome, TerraIncognita. The performance of (CLIP + AP) - (CLIP) shows the consistent improvement over CLIP all of the datasets. We highlight the most improved domain in each dataset.
+python domainbed/scripts/sweep.py delete_incomplete --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
+
+    
+python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
+    
+```
+
+
+Note: change `--dataset DATASET --algorithms ALGORITHM --trial_seed TRIAL_SEED --test_envs TEST_ENV` for different experiments. 
+
+(e.g., `python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/PACS --command_launcher multi_gpu --trial_seed 0 --algorithms DPLCLIP --datasets PACS --test_envs [0] --n_hparams_from 0 --n_hparams 4 --skip_confirmation`). 
+
+## Main changes in DPLCLIP from the T3A implementation.
+1. The main code of algorithm is in `domainbed/algorithms.py`. 
+2. The data transform of CLIP is implemented in `domainbed/datasets.py`. 
+3. The scope of hyperparameters are defined in `domainbed/hparams_registry.py`. 
+4. The implements of CLIP backbone for ERM, CORAL, and other methods are in `domainbed/networks.py`. 
+
+### The main code for Domain Prompt Learning (DPLCLIP), the 126~256 lines in./domainbed/algorithms.py.
+
+```python
+class CLIP(Algorithm):
+    def __init__(self, input_shape, num_classes, num_domains, hparams):
+        super(CLIP, self).__init__(input_shape, num_classes, num_domains, hparams)
+        self.hparams = hparams
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        
+        self.clip_model = clip.load(self.hparams['clip_backbone'])[0].float()
+
+        for param in self.clip_model.parameters():
+            param.requires_grad = False
+        
+        print('Set self.clip_model.parameters.reguires_grad = False!')
+
+        # embedding dim for image and text encoder.
+        self.EMBEDDING_DIM = 512  # 
+        
+        classnames = [name.replace('_', ' ') for name in hparams['class_names']]
+        self.prompt = torch.cat([clip.tokenize(f'a photo of a {ppt}') for ppt in classnames]).to(self.device)
+        
+    def update(self, minibatches, unlabeled=None):
+        return {'loss': 0}
+    
+    def predict(self, x):
+        logits_per_image, _ = self.clip_model(x, self.prompt)
+        return logits_per_image.softmax(dim=-1)
+     
+
+# rename to DPL (Domain Prompt Learning)
+class DPLCLIP(CLIP):
+    def __init__(self, input_shape, num_classes, num_domains, hparams, sentence_prompt=False):
+        super(DPLCLIP, self).__init__(input_shape, num_classes, num_domains, hparams)
+
+        #  initial prompt.
+        prompt_prefix = ' '.join(['X'] * hparams['num_domain_tokens'])
+        
+        if sentence_prompt:
+            print('Using sentence_prompt in DPLCLIP...')
+            classnames = [f"a photo of a {name.replace('_', ' ')}" for name in hparams['class_names']]
+        else:
+            classnames = [name.replace('_', ' ') for name in hparams['class_names']]
+        prompts = [prompt_prefix + ' ' + name + '.' for name in classnames]
+        # prompts:  ['X X X X X X X X dog.', 'X X X X X X X X elephant.' ...]
+        
+        #  to get default token_prefix and token_suffix.
+        self.tokenized_prompts = torch.cat([clip.tokenize(p) for p in prompts]).to(self.device)
+        # tokenized_prompts[0] = tensor([49406,   343,   343,   343,   343,   343,   343,   343,   343,  1929, 269, 49407, 0, 0, ...])
+        with torch.no_grad():
+            embedding = self.clip_model.token_embedding(self.tokenized_prompts).type(self.clip_model.dtype)
+        
+        self.register_buffer('token_prefix', embedding[:, :1, :])  # SOS
+        #  torch.Size([7, 1, 512])
+        #  [-0.0001,  0.0002, -0.0046,  ...,  0.0010,  0.0025,  0.0049]
+        
+        self.register_buffer('token_suffix', embedding[:, hparams['num_domain_tokens'] + 1:, :])  # CLS, EOS
+        # torch.Size([7, 68, self.EMBEDDING_DIM]), 68 := 77 - num_domain_tokens_tokens - 2.
+        # [ 0.0013,  0.0046, -0.0115,  ...,  0.0112,  0.0147,  0.0040],...,.
+        
+        self.network = networks.MLP(self.EMBEDDING_DIM, self.EMBEDDING_DIM * hparams['num_domain_tokens'], hparams).to(device=self.device, dtype=self.clip_model.dtype)
+        
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                torch.nn.init.xavier_uniform(m.weight)
+                m.bias.data.fill_(0.01)
+        
+        self.network.apply(init_weights)
+        
+        self.optimizer = torch.optim.SGD(
+            self.network.parameters(),
+            lr=self.hparams["lr"],
+            momentum=self.hparams["momentum"]
+        )
+            
+    def update(self, minibatches, unlabeled=None):
+        # minibatches = [[domain_1], [domain_2], [domain_3]]
+        all_x = [data[0].cuda().float() for data in minibatches]
+        all_y = torch.cat([data[1].cuda().long() for data in minibatches])
+
+        #  encode image for each domain.
+        image_features = [self.clip_model.encode_image(x) for x in all_x]
+        
+        #  extract domain_feature for each domain. [32, self.EMBEDDING_DIM] -> [32, self.EMBEDDING_DIM * num_domain_tokens] -> [self.EMBEDDING_DIM * num_domain_tokens].
+        domain_features = [self.network(feature) for feature in image_features]
+        image_features = torch.cat(image_features)
+        #  reshape [self.batch_size, self.EMBEDDING_DIM.]:  -> [1, self.EMBEDDING_DIM.]
+        mean_domain_features = [feature.mean(dim=0, keepdim=True) for feature in domain_features]
+
+        #  reshape [1, self.EMBEDDING_DIM.]:  -> [7, self.EMBEDDING_DIM.]
+        _mean_domain_features = [feature.repeat_interleave(len(self.hparams['class_names']), dim=0) for feature in mean_domain_features]
+        
+        #  generate text_feature from domain_feature. text_features.size = [3, 7, 512]
+        # text_features = [self._get_text_features(feature) for feature in _mean_domain_features]
+        text_features = torch.cat([self._get_text_features(feature) for feature in _mean_domain_features])
+            
+        image_features = image_features / image_features.norm(dim=-1, keepdim=True)
+        text_features = text_features / text_features.norm(dim=-1, keepdim=True)
+        logits_per_image = self.clip_model.logit_scale.exp() * image_features @ text_features.t()
+        loss = F.cross_entropy(logits_per_image, all_y)
+            
+        self.optimizer.zero_grad()
+        loss.backward()
+        self.optimizer.step()
+        return {"loss": loss.item()}
+
+
+    def _get_text_features(self, domain_feature, coop=False):
+        #  reshape domain_feature: [7, 16 * self.EMBEDDING_DIM] -> [7, 16, self.EMBEDDING_DIM]
+        if coop:
+            domain_feature = domain_feature.unsqueeze(0).expand(len(self.hparams['class_names']), -1, -1)
+        domain_feature = domain_feature.reshape(-1, self.hparams['num_domain_tokens'], self.EMBEDDING_DIM)
+        #  reshape domain_feature: [7, 16, self.EMBEDDING_DIM] -> [7, 77, self.EMBEDDING_DIM]
+        domain_feature = torch.cat([self.token_prefix, domain_feature, self.token_suffix], dim=1)
+        #  refer CoOp: CoOP github. https://github.com/KaiyangZhou/CoOp/blob/b0a058869cef00a4e4ea5256d40fd7681119c099/trainers/coop.py#L46
+        x = domain_feature + self.clip_model.positional_embedding.type(self.clip_model.dtype)
+        x = x.permute(1, 0, 2)
+        x = self.clip_model.transformer(x)
+        x = x.permute(1, 0, 2)
+        x = self.clip_model.ln_final(x).type(self.clip_model.dtype)
+        #  mapping domain_features to text_features.
+        text_features = x[torch.arange(x.shape[0]), self.tokenized_prompts.argmax(dim=-1)] @ self.clip_model.text_projection      
+        return text_features
+
+    def predict(self, x):
+        image_feature = self.clip_model.encode_image(x)
+        
+        domain_feature = self.network(image_feature)
+        mean_domain_feature = torch.mean(domain_feature, dim=0, keepdim=True).repeat_interleave(len(self.hparams['class_names']), dim=0)
+        text_feature = self._get_text_features(mean_domain_feature)
+        
+        image_feature = image_feature / image_feature.norm(dim=-1, keepdim=True)
+        text_feature = text_feature / text_feature.norm(dim=-1, keepdim=True)
+        return self.clip_model.logit_scale.exp() * image_feature @ text_feature.t()
+
+```
+
+## License
+
+This source code is released under the MIT license, included [here](LICENSE).

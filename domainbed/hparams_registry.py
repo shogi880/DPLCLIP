@@ -37,7 +37,7 @@ def _hparams(algorithm, dataset, random_seed):
     # Algorithm-specific hparam definitions. Each block of code below
     # corresponds to exactly one algorithm.
 
-    if algorithm in ['DANN', 'CDANN', 'DANNCLIP']:
+    if algorithm in ['DANN', 'CDANN']:
         _hparam('lambda', 1.0, lambda r: 10**r.uniform(-2, 2))
         _hparam('weight_decay_d', 0., lambda r: 10**r.uniform(-6, -2))
         _hparam('d_steps_per_g_step', 1, lambda r: int(2**r.uniform(0, 3)))
@@ -79,63 +79,62 @@ def _hparams(algorithm, dataset, random_seed):
 
     elif algorithm == "SD":
         _hparam('sd_reg', 0.1, lambda r: 10**r.uniform(-5, -1))
-    
+
     elif algorithm == "CLIP":
         _hparam('prompt', 'class_name', lambda r: r.choice(['class_name', 'domain_name']))
         
-    elif algorithm == "DomainCLIP":
-        _hparam('prompt', 'domain_name', lambda r: r.choice(['class_name', 'domain_name']))
-        
-    elif algorithm in ["DPCLIP", "CoOp", "ERMDPCLIP", "DPICLIP", "APCLIP"]:
-        _hparam('num_domain_tokens', 16, lambda r: int(r.choice([8, 16])))  # the parameter should be int, not numpy.int, due to dump into results.jsonl.
+    elif algorithm in ["DPLCLIP"]:
+        _hparam('num_domain_tokens', 16, lambda r: int(r.choice([2, 4, 8, 16])))  # the parameter should be int, not numpy.int, due to dump into results.jsonl.
         _hparam('gamma', 0.3, lambda r: r.choice([0.01, 0.3, 0.4]))
         _hparam('beta', 0.4, lambda r: r.choice([0.3, 0.4]))
         # MLP
-        _hparam('mlp_depth', 3, lambda r: int(r.choice([2, 3])))
-        _hparam('mlp_width', 512, lambda r: int(r.choice([512])))
-        _hparam('mlp_dropout', 0.1, lambda r: r.choice([0.0, 0.1]))
-    
-    elif algorithm in ["UDGCLIP"]:
-        _hparam('num_domain_tokens', 1, lambda r: int(r.choice([1, 2, 4])))  # the parameter should be int, not numpy.int, due to dump into results.jsonl.
-        _hparam('mlp_depth', 3, lambda r: int(r.choice([2, 3])))
+        _hparam('mlp_depth', 3, lambda r: int(r.choice([3])))
         _hparam('mlp_width', 512, lambda r: int(r.choice([256, 512])))
         _hparam('mlp_dropout', 0.1, lambda r: r.choice([0.0, 0.1]))
-    # Dataset-and-algorithm-specific hparam definitions. Each block of code
+    
     # below corresponds to exactly one hparam. Avoid nested conditionals.
-    if dataset in SMALL_IMAGES or algorithm in ["DPCLIP", "CoOp", "ERMDPCLIP", "DPICLIP", "APCLIP", "UDGCLIP"]:
+    if dataset in SMALL_IMAGES or algorithm in ["DPLCLIP"]:  # DPLCLIP using SGD follower prior work.
         _hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
     else:
         _hparam('lr', 5e-5, lambda r: 10**r.uniform(-5, -3.5))
 
-    if dataset in SMALL_IMAGES or algorithm in ["DPCLIP", "CoOp", "ERMDPCLIP","DPICLIP", "APCLIP", "UDGCLIP"]:
+    if dataset in SMALL_IMAGES or algorithm in ["DPLCLIP"]:
         _hparam('weight_decay', 0., lambda r: 0.)
         _hparam('momentum', 0.1, lambda r: r.choice([0.0, 0.1, 0.2]))
     else:
         _hparam('weight_decay', 0., lambda r: 10**r.uniform(-6, -2))
 
+
+    # Dataset-and-algorithm-specific hparam definitions. Each block of code
+    # below corresponds to exactly one hparam. Avoid nested conditionals.
+
     if dataset in SMALL_IMAGES:
-        _hparam('batch_size', 64, lambda r: int(2**r.uniform(3, 9)))
+        _hparam('batch_size', 64, lambda r: int(2**r.uniform(3, 9)) )
     elif algorithm == 'ARM':
         _hparam('batch_size', 8, lambda r: 8)
     elif dataset == 'DomainNet':
-        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5)))
+        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5)) )
     else:
-        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5.5)))
+        _hparam('batch_size', 32, lambda r: int(2**r.uniform(3, 5.5)) )
 
-    if algorithm in ['DANN', 'CDANN', 'DANNCLIP'] and dataset in SMALL_IMAGES:
+
+    if algorithm in ['DANN', 'CDANN'] and dataset in SMALL_IMAGES:
         _hparam('lr_g', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5) )
-    elif algorithm in ['DANN', 'CDANN', 'DANNCLIP']:
+    elif algorithm in ['DANN', 'CDANN']:
         _hparam('lr_g', 5e-5, lambda r: 10**r.uniform(-5, -3.5) )
 
-    if algorithm in ['DANN', 'CDANN', 'DANNCLIP'] and dataset in SMALL_IMAGES:
+
+    if algorithm in ['DANN', 'CDANN'] and dataset in SMALL_IMAGES:
         _hparam('lr_d', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5) )
-    elif algorithm in ['DANN', 'CDANN', 'DANNCLIP']:
+    elif algorithm in ['DANN', 'CDANN']:
         _hparam('lr_d', 5e-5, lambda r: 10**r.uniform(-5, -3.5) )
 
-    if algorithm in ['DANN', 'CDANN', 'DANNCLIP'] and dataset in SMALL_IMAGES:
+
+    if algorithm in ['DANN', 'CDANN'] and dataset in SMALL_IMAGES:
         _hparam('weight_decay_g', 0., lambda r: 0.)
-    elif algorithm in ['DANN', 'CDANN', 'DANNCLIP']:
+    elif algorithm in ['DANN', 'CDANN']:
         _hparam('weight_decay_g', 0., lambda r: 10**r.uniform(-6, -2) )
+
 
     return hparams
 

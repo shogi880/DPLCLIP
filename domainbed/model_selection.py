@@ -8,7 +8,6 @@ def get_test_records(records):
     records with *only* that single test env and no other test envs)"""
     return records.filter(lambda r: len(r['args']['test_envs']) == 1)
 
-
 class SelectionMethod:
     """Abstract class whose subclasses implement strategies for model
     selection across hparams and timesteps."""
@@ -52,7 +51,6 @@ class SelectionMethod:
         else:
             return None
 
-
 class OracleSelectionMethod(SelectionMethod):
     """Like Selection method which picks argmax(test_out_acc) across all hparams
     and checkpoints, but instead of taking the argmax over all
@@ -70,10 +68,9 @@ class OracleSelectionMethod(SelectionMethod):
         test_in_acc_key = 'env{}_in_acc'.format(test_env)
         chosen_record = run_records.sorted(lambda r: r['step'])[-1]
         return {
-            'val_acc': chosen_record[test_out_acc_key],
+            'val_acc':  chosen_record[test_out_acc_key],
             'test_acc': chosen_record[test_in_acc_key]
         }
-
 
 class IIDAccuracySelectionMethod(SelectionMethod):
     """Picks argmax(mean(env_out_acc for env in train_envs))"""
@@ -84,7 +81,6 @@ class IIDAccuracySelectionMethod(SelectionMethod):
         """Given a single record, return a {val_acc, test_acc} dict."""
         test_env = record['args']['test_envs'][0]
         val_env_keys = []
-        # pdb.set_trace()
         for i in itertools.count():
             if f'env{i}_out_acc' not in record:
                 break
@@ -103,7 +99,6 @@ class IIDAccuracySelectionMethod(SelectionMethod):
             return None
         return test_records.map(self._step_acc).argmax('val_acc')
 
-
 class LeaveOneOutSelectionMethod(SelectionMethod):
     """Picks (hparams, step) by leave-one-out cross validation."""
     name = "leave-one-domain-out cross-validation"
@@ -116,8 +111,7 @@ class LeaveOneOutSelectionMethod(SelectionMethod):
         if len(test_records) != 1:
             return None
 
-        test_env = test_records[0]['args']['test_envs'][0]  # the first one is your final DG test_env.
-        
+        test_env = test_records[0]['args']['test_envs'][0]
         n_envs = 0
         for i in itertools.count():
             if f'env{i}_out_acc' not in records[0]:
@@ -127,7 +121,6 @@ class LeaveOneOutSelectionMethod(SelectionMethod):
         for r in records.filter(lambda r: len(r['args']['test_envs']) == 2):
             val_env = (set(r['args']['test_envs']) - set([test_env])).pop()
             val_accs[val_env] = r['env{}_in_acc'.format(val_env)]
-        
         val_accs = list(val_accs[:test_env]) + list(val_accs[test_env+1:])
         if any([v==-1 for v in val_accs]):
             return None

@@ -17,7 +17,7 @@ import numpy as np
 import tqdm
 
 from domainbed import datasets
-from domainbed import algorithms
+# from domainbed import algorithms
 from domainbed.lib import misc, reporting
 from domainbed import model_selection
 from domainbed.lib.query import Q

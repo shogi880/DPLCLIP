@@ -4,12 +4,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision.models
 
-from domainbed.lib import misc
-from domainbed.lib import wide_resnet
+# from domainbed.lib import misc
+# from domainbed.lib import wide_resnet
 from domainbed.lib import big_transfer
 from domainbed.lib import vision_transformer
 from domainbed.lib import mlp_mixer
 
+import clip
 
 def remove_batch_norm_from_resnet(model):
     fuse = torch.nn.utils.fusion.fuse_conv_bn_eval
@@ -57,7 +58,6 @@ class MLP(nn.Module):
     """Just  an MLP"""
     def __init__(self, n_inputs, n_outputs, hparams):
         super(MLP, self).__init__()
-        self.hparams = hparams
         self.input = nn.Linear(n_inputs, hparams['mlp_width'])
         self.dropout = nn.Dropout(hparams['mlp_dropout'])
         self.hiddens = nn.ModuleList([
@@ -76,7 +76,6 @@ class MLP(nn.Module):
             x = F.relu(x)
         x = self.output(x)
         return x
-
 
 
 class ResNet(torch.nn.Module):
@@ -209,20 +208,21 @@ class ContextNet(nn.Module):
 
 def Featurizer(input_shape, hparams):
     """Auto-select an appropriate featurizer for the given input shape."""
-    if hparams['use_clip']:
+    if hparams['backbone'] == 'clip':
+    # if 'clip_' in hparams['backbone']:
         return CLIP_Featurizer(hparams)
     elif len(input_shape) == 1:
         return MLP(input_shape[0], 128, hparams)
-    elif input_shape[1:3] == (28, 28):
-        return MNIST_CNN(input_shape)
-    elif input_shape[1:3] == (32, 32):
-        return wide_resnet.Wide_ResNet(input_shape, 16, 2, 0.)
+    # elif input_shape[1:3] == (28, 28):
+        # return MNIST_CNN(input_shape)
+    # elif input_shape[1:3] == (32, 32):
+        # return wide_resnet.Wide_ResNet(input_shape, 16, 2, 0.)
     elif input_shape[1:3] == (224, 224) and hparams['backbone'] in ['resnet50', 'resnet18', 'resnet50-BN', 'resnet18-BN']:
         return ResNet(input_shape, hparams)
     elif input_shape[1:3] == (224, 224) and 'ViT-' in hparams['backbone']:
         return vision_transformer.ViT2(input_shape, hparams)
-    elif input_shape[1:3] == (224, 224) and hparams['backbone'] in ['B_16', 'B_32', 'L_16', 'L_32']:
-        return vision_transformer.ViT(input_shape, hparams)
+    # elif input_shape[1:3] == (224, 224) and hparams['backbone'] in ['B_16', 'B_32', 'L_16', 'L_32']:
+        # return vision_transformer.ViT(input_shape, hparams)
     elif input_shape[1:3] == (224, 224) and 'dino' in hparams['backbone']:
         return vision_transformer.DINO(input_shape, hparams)
     elif input_shape[1:3] == (224, 224) and 'DeiT' in hparams['backbone']:
@@ -237,45 +237,32 @@ def Featurizer(input_shape, hparams):
         raise NotImplementedError
 
 
-def Classifier(in_features, out_features, hparams=None):
-    if hparams['prompt_classifier']:
-        return CLIP_Classifier(hparams)
+class CLIP_Featurizer(nn.Module):
+    def __init__(self, hparams):
+        super().__init__()
+        print(hparams['clip_backbone'])
+        # RN50 -> 1024
+        # RN50x4 -> 640
+        # RN50x16 -> 768
+        # RN101, ViT-B/32, ViT-B/16 -> 512
+        if hparams['clip_backbone'] not in ['ViT-B/32', 'ViT-B/16', 'RN101']:
+            raise ValueError('Unknown clip_backbone: {}'.format(hparams['clip_backbone']))
+        
+        print(f'Using {hparams["clip_backbone"]}...')
+        self.clip_model = clip.load(hparams["clip_backbone"])[0].float()
+        self.n_outputs = 512
     
-    elif hparams['nonlinear_classifier']:
+    def forward(self, x):
+        return self.clip_model.encode_image(x)
+
+
+def Classifier(in_features, out_features, is_nonlinear=False):
+    if is_nonlinear:
         return torch.nn.Sequential(
             torch.nn.Linear(in_features, in_features // 2),
             torch.nn.ReLU(),
             torch.nn.Linear(in_features // 2, in_features // 4),
             torch.nn.ReLU(),
             torch.nn.Linear(in_features // 4, out_features))
-    
     else:
         return torch.nn.Linear(in_features, out_features)
-
-
-import clip
-class CLIP_Featurizer(nn.Module):
-    def __init__(self, hparams):
-        super().__init__()
-        assert hparams['backbone'] == 'ViT-B/16'
-        self.clip_model = clip.load(hparams['backbone'])[0].float()
-        self.n_outputs = 512
-    
-    def forward(self, x):
-        return self.clip_model.encode_image(x)
-
-class CLIP_Classifier(nn.Module):
-    def __init__(self, hparams):
-        super().__init__()
-        clip_model = clip.load(hparams['backbone'])[0].float()
-        
-        self.logit_scale_exp = clip_model.logit_scale.exp()
-        classnames = [name.replace('_', ' ') for name in hparams['class_names']]
-        print(classnames)
-        prompt = torch.cat([clip.tokenize(ppt) for ppt in classnames]).to('cuda') 
-        text_features = clip_model.encode_text(prompt)
-        self.text_features = text_features / text_features.norm(dim=-1, keepdim=True)
-        
-    def forward(self, x):
-        x = x / x.norm(dim=-1, keepdim=True)
-        return self.logit_scale_exp * x @ self.text_features.t()

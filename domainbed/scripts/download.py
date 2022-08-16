@@ -29,7 +29,7 @@ def stage_path(data_dir, name):
 
 def download_and_extract(url, dst, remove=True):
     gdown.download(url, dst, quiet=False)
-    # import ipdb; ipdb.set_trace()
+
     if dst.endswith(".tar.gz"):
         tar = tarfile.open(dst, "r:gz")
         tar.extractall(os.path.dirname(dst))
@@ -207,7 +207,7 @@ def download_terra_incognita(data_dir):
             continue
 
         loc_folder = os.path.join(destination_folder,
-                                'location_' + str(image_location) + '/')
+                                  'location_' + str(image_location) + '/')
 
         if not os.path.exists(loc_folder):
             os.mkdir(loc_folder)
