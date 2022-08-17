@@ -1,9 +1,11 @@
 # Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains
 
-The official implementation of `Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains`, based on [T3A](<https://openreview.net/forum?id=e_yvNqkJKAW&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DNeurIPS.cc%2F2021%2FConference%2FAuthors%23your-submissions)>). 
+The official implementation of `Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains` ([arxiv](https://arxiv.org/abs/2111.12853v3)).
+
+This codebase is based on [T3A](<https://openreview.net/forum?id=e_yvNqkJKAW&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DNeurIPS.cc%2F2021%2FConference%2FAuthors%23your-submissions)>). 
 and [DomainBed](https://github.com/facebookresearch/DomainBed).
 
-## <summary>Overview of Domain Prompt Learning</summary>
+## Overview of Domain Prompt Learning
 
 ![figure1](./imgs/main.png)
 ![figure1](./imgs/concept.png)
@@ -25,7 +27,7 @@ pip install -r requirements.txt
 ```
 </div></details>
 
-<details><summary>1. Downlload the datasets</summary><div>
+<details><summary>1. Download the datasets</summary><div>
 
 ```sh
 python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
