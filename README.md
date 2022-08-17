@@ -42,6 +42,7 @@ Note: change `--dataset DATASET --algorithms ALGORITHM --trial_seed TRIAL_SEED -
 2. The data transform of CLIP is implemented in `domainbed/datasets.py`. 
 3. The scope of hyperparameters are defined in `domainbed/hparams_registry.py`. 
 4. The implements of CLIP backbone for ERM, CORAL, and other methods are in `domainbed/networks.py`. 
+5. The visualization of the results are in `domainbed/scripts/summarize_results.ipynb`, `domainbed/scripts/visualization_dlp_results.py`, `domainbed/scripts/visualization_tsne_datasets.py`. 
 
 ### The main code for Domain Prompt Learning (DPLCLIP), the 126~256 lines in./domainbed/algorithms.py.
 
