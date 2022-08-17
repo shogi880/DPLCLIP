@@ -1,28 +1,41 @@
 # Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains
 
-This codebase is the official implementation of `Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains`.
-This codebase is based on [T3A](<https://openreview.net/forum?id=e_yvNqkJKAW&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DNeurIPS.cc%2F2021%2FConference%2FAuthors%23your-submissions)>). 
+The official implementation of `Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains`, based on [T3A](<https://openreview.net/forum?id=e_yvNqkJKAW&referrer=%5BAuthor%20Console%5D(%2Fgroup%3Fid%3DNeurIPS.cc%2F2021%2FConference%2FAuthors%23your-submissions)>). 
 and [DomainBed](https://github.com/facebookresearch/DomainBed).
+
+## <summary>Overview of Domain Prompt Learning</summary>
+
+![figure1](./imgs/main.png)
+![figure1](./imgs/concept.png)
+![figure1](./imgs/architecture.png)
+![figure1](./imgs/Table_1_dg.png)
+![figure1](./imgs/Table_2_tta.png)
+![figure1](./imgs/Table_3_backbone.png)
+![figure1](./imgs/Table_4_frozen.png)
+
 
 ## Installation
 
-#### Python libralies
+<details><summary>0. Python libralies</summary><div>
 
 ```sh
 python3 -m venv ~/venv/dplclip
 source ~/venv/dplclip/bin/activate
 pip install -r requirements.txt
 ```
+</div></details>
 
-#### (1) Downlload the datasets
+<details><summary>1. Downlload the datasets</summary><div>
 
 ```sh
 python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
 ```
 Note: change `--dataset pacs` for downloading other datasets (e.g., `vlcs`, `office_home`, `terra_incognita`). 
+</div></details>
 
 
-#### (2) Table 1, 2, 3 & 4: Domain Generalization & Test-Time Adaptation Experiment.
+<details><summary>2. DG & TTA experiment scripts.</summary><div>
+
 ```sh
 
 python domainbed/scripts/sweep.py delete_incomplete --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
@@ -36,15 +49,17 @@ python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=
 Note: change `--dataset DATASET --algorithms ALGORITHM --trial_seed TRIAL_SEED --test_envs TEST_ENV` for different experiments. 
 
 (e.g., `python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/PACS --command_launcher multi_gpu --trial_seed 0 --algorithms DPLCLIP --datasets PACS --test_envs [0] --n_hparams_from 0 --n_hparams 4 --skip_confirmation`). 
+</div></details>
 
-## Main changes in DPLCLIP from the T3A implementation.
+## Main difference in DPLCLIP from the [T3A implementation](https://github.com/matsuolab/T3A).
 1. The main code of algorithm is in `domainbed/algorithms.py`. 
 2. The data transform of CLIP is implemented in `domainbed/datasets.py`. 
 3. The scope of hyperparameters are defined in `domainbed/hparams_registry.py`. 
 4. The implements of CLIP backbone for ERM, CORAL, and other methods are in `domainbed/networks.py`. 
 5. The visualization of the results are in `domainbed/scripts/summarize_results.ipynb`, `domainbed/scripts/visualization_dlp_results.py`, `domainbed/scripts/visualization_tsne_datasets.py`. 
 
-### The main code for Domain Prompt Learning (DPLCLIP), the 126~256 lines in./domainbed/algorithms.py.
+
+<details><summary>Implement CLIP in DomainBed</summary><div>
 
 ```python
 class CLIP(Algorithm):
@@ -72,8 +87,12 @@ class CLIP(Algorithm):
     def predict(self, x):
         logits_per_image, _ = self.clip_model(x, self.prompt)
         return logits_per_image.softmax(dim=-1)
-     
+```
+</div></details>
 
+<details><summary>Implement DPL for CLIP in DomainBed</summary><div>
+
+```python
 # rename to DPL (Domain Prompt Learning)
 class DPLCLIP(CLIP):
     def __init__(self, input_shape, num_classes, num_domains, hparams, sentence_prompt=False):
@@ -180,6 +199,7 @@ class DPLCLIP(CLIP):
         return self.clip_model.logit_scale.exp() * image_feature @ text_feature.t()
 
 ```
+</div></details>
 
 ## License
 
