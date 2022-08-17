@@ -8,26 +8,22 @@ def plot_image(image_name):
     dataset = image_name.split('-')[0]
     domain = image_name.split('-')[1]
     class_name = image_name.split('-')[2]
-    image_path = f'/home/acc12252dc/datasets/{dataset}/{domain}/{class_name}/*'
+    image_path = f'~/datasets/{dataset}/{domain}/{class_name}/*'
     images = glob.glob(image_path)[:4]
     fig=plt.figure()
-    # print(image_name, len(images))
     for image in images:
         axes.append( fig.add_subplot(rows, cols, i+1) )
-        # plt.figure(figsize=(5, 3))
         axes[-1].set_title(subplot_title)  
         image = cv2.imread(imag)
         plt.axis('off')
         plt.imshow(image)
-        # plt.subplots_adjust(left=0.2, right=0.8, top=0.8, bottom=0.2)
-        # plt.imshow(image)
         plt.show()
 
 def get_image_paths(image_name, num=5):
     dataset = image_name.split('-')[0]
     domain = image_name.split('-')[1]
     class_name = image_name.split('-')[2]
-    image_path = f'/groups/gcb50389/xinzhang/datasets/{dataset}/{domain}/{class_name}/*'
+    image_path = f'~/datasets/{dataset}/{domain}/{class_name}/*'
     images = glob.glob(image_path)[:num]
     # print(image_name, len(images))
     return images
@@ -42,75 +38,12 @@ coral = [82.0, 93.2, 78.9, 53.5, 76.9]
 dann = [83.2, 93.8, 78.8, 52.2, 77.0]
 
 
-
-# X = np.arange(5) 
-# n = 7 #種類数
-# y = []
-# Y = [clip, template , domain, erm, coral, dann, ap]
-# for i in Y:
-#   y.append([float(num) for num in i])
-# # for i in range(n):
-#   # Y.append(np.random.uniform(1, 10, 5))
-# print(y)
-# group_gap = 0.4 #グループ間の隙間
-# bar_gap = 0.02 #棒間の隙間
-# width = (1 - group_gap)/n
-# shift = width + bar_gap
-
-
-# # color = []
-# # for i in range(n):
-# #   color.append((1.0 - i/n, 0, i/n))
-
-# fig, ax = plt.subplots(figsize=(10, 3))
-# for i in range(n):
-#   # color=[(0.8 - (i/n) / 2, 0, i/n)]
-#   ax.bar(X+shift*i, y[i], width)
-
-# ax.set_ylim(20,100)
-
-# fig.show()
-
-
-
-# X = np.arange(5) 
-# n = 7 #種類数
-# y = []
-# Y = [clip, template , domain, erm, coral, dann, ap]
-# for i in Y:
-#   y.append([float(num) for num in i])
-# # for i in range(n):
-#   # Y.append(np.random.uniform(1, 10, 5))
-# print(y)
-# group_gap = 0.4 #グループ間の隙間
-# bar_gap = 0.02 #棒間の隙間
-# width = (1 - group_gap)/n
-# shift = width + bar_gap
-
-# fig, ax = plt.subplots(figsize=(5, 3))
-# for i in range(n):
-#   # color=[(0.8 - (i/n) / 2, 0, i/n)]
-#   ax.bar(X+shift*i, y[i], width)
-
-# ax.set_ylim(20,100)
-
-# fig.show()
-
-
 RESULTS = [clip, erm, coral, dann, template ,  ap]
-X = ['ERM', 'COR', 'DANN', '+temp' , '+DoP']
-X = ['ERM', 'CORAL', 'DANN', '+T' , '+DoP']
-color = ['powderblue', 'paleturquoise', 'skyblue', 'pink', 'crimson'] # 色リスト。循環して使用される。
+X = ['ERM', 'COR', 'DANN', '+temp' , '+DPL']
+X = ['ERM', 'CORAL', 'DANN', '+T' , '+DPL']
+color = ['powderblue', 'paleturquoise', 'skyblue', 'pink', 'crimson']
 DATASETS = ['VLCS', 'PACS', 'OfficeHome', 'Terra', 'Average']
-# RESULTS = [clip, erm, coral, dann, template , domain,  ap]
-# X = ['ERM', 'COR', 'DANN', '+temp' , '+domain', '+DoP']
-# X = ['ERM', 'CO', 'DA', '+T' , '+D', '+DoP']
-# color = ['powderblue', 'paleturquoise', 'skyblue', 'pink', 'palevioletred', 'crimson'] # 色リスト。循環して使用される。
-# DATASETS = ['VLCS', 'PACS', 'OfficeHome', 'Terra', 'Average']
 
-
-# fig, ax = plt.plots()
-# ax[0].plot(range(5), range(5, 10))
 def show_average():
     dataset=4
     result = [RESULT[dataset] for RESULT in RESULTS]
