@@ -99,7 +99,7 @@ python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=
 5. The visualization of the results are in `domainbed/scripts/summarize_results.ipynb`, `domainbed/scripts/visualization_dlp_results.py`, `domainbed/scripts/visualization_tsne_datasets.py`. 
 
 
-<details><summary>Implement CLIP in DomainBed</summary><div>
+<details><summary>CLIP in DomainBed</summary><div>
 
 ```python
 class CLIP(Algorithm):
@@ -130,7 +130,7 @@ class CLIP(Algorithm):
 ```
 </div></details>
 
-<details><summary>Implement DPL for CLIP in DomainBed</summary><div>
+<details><summary>DPL for CLIP in DomainBed</summary><div>
 
 ```python
 class DPLCLIP(CLIP):
@@ -249,7 +249,7 @@ class DPLCLIP(CLIP):
 ```
 </div></details>
 
-<details><summary>The hyperparameters.</summary><div>
+<details><summary>Hyperparameter</summary><div>
 
 The new parameters we added to DomainBed `hparams_registry.py`
 
