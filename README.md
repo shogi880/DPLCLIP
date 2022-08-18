@@ -17,12 +17,27 @@ Combining DPL with CLIP provides surprising performance, raising the accuracy of
 
 
 ![figure1](./imgs/main.png)
-![figure1](./imgs/concept.png)
 ![figure1](./imgs/architecture.png)
+<details><summary>Compare with DG Methods</summary><div>
+
 ![figure1](./imgs/Table_1_dg.png)
+</div></details>
+<details><summary>Compare with TTA Methods</summary><div>
+
 ![figure1](./imgs/Table_2_tta.png)
+</div></details>
+<details><summary>Compare with other backbones </summary><div>
+
 ![figure1](./imgs/Table_3_backbone.png)
+</div></details>
+<details><summary>Frozen backbone ablation </summary><div>
+
 ![figure1](./imgs/Table_4_frozen.png)
+</div></details>
+
+
+
+
 
 
 ## Installation
