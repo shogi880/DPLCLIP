@@ -85,8 +85,6 @@ def _hparams(algorithm, dataset, random_seed):
         
     elif algorithm in ["DPLCLIP"]:
         _hparam('num_domain_tokens', 16, lambda r: int(r.choice([2, 4, 8, 16])))  # the parameter should be int, not numpy.int, due to dump into results.jsonl.
-        _hparam('gamma', 0.3, lambda r: r.choice([0.01, 0.3, 0.4]))
-        _hparam('beta', 0.4, lambda r: r.choice([0.3, 0.4]))
         # MLP
         _hparam('mlp_depth', 3, lambda r: int(r.choice([3])))
         _hparam('mlp_width', 512, lambda r: int(r.choice([256, 512])))

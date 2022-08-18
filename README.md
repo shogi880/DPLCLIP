@@ -21,40 +21,54 @@ Domain generalization (DG) is a difficult transfer learning problem aiming to le
 
 ## Installation
 
-<details><summary>0. Python libralies</summary><div>
+### 0. Python libralies
 
 ```sh
 python3 -m venv ~/venv/dplclip
 source ~/venv/dplclip/bin/activate
 pip install -r requirements.txt
 ```
-</div></details>
 
-<details><summary>1. Download the datasets</summary><div>
+
+### 1. Download the datasets
 
 ```sh
 python -m domainbed.scripts.download --data_dir=/my/datasets/path --dataset pacs
 ```
 Note: change `--dataset pacs` for downloading other datasets (e.g., `vlcs`, `office_home`, `terra_incognita`). 
-</div></details>
 
 
-<details><summary>2. DG & TTA experiment scripts.</summary><div>
 
-```sh
+### 2. DG experiment scripts.
 
-python domainbed/scripts/sweep.py delete_incomplete --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
+```sh    
+python -m domainbed.scripts.train\
+       --data_dir /my/datasets/path\
+       --output_dir /my/pretrain/path\
+       --algorithm ALGORITHM\
+       --dataset DATASET\
+       --hparams "{\"backbone\": \"resnet50\"}" 
+```
+Note: change ` --algorithms ALGORITHM --dataset DATASET` for different experiments.
 
-    
-python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/DATASET --command_launcher multi_gpu --trial_seed TRIAL_SEED --algorithms ALGORITHM --datasets DATASET --test_envs TEST_ENV --n_hparams_from 0 --n_hparams 20 --skip_confirmation
-    
+
+### 3. TTA experiment scripts. 
+Which is based on model trained in DG experiments. 
+Please also refer to [T3A](https://github.com/matsuolab/T3A).
+
+```sh    
+python -m domainbed.scripts.unsupervised_adaptation\
+       --input_dir=/my/pretrain/path\
+       --adapt_algorithm=T3A
 ```
 
+Also you can use `domainbed/scripts/sweep.py` to run the compeleted experiment.
 
-Note: change `--dataset DATASET --algorithms ALGORITHM --trial_seed TRIAL_SEED --test_envs TEST_ENV` for different experiments. 
+Note that which needs lots of computing and takes long times for all experiments!
+```sh
+python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/PACS --algorithms DPLCLIP --datasets PACS --test_envs [0]
+```
 
-(e.g., `python domainbed/scripts/sweep.py launch --data_dir=/home/datasets --output_dir=/output_dir/sweep_hparam/PACS --command_launcher multi_gpu --trial_seed 0 --algorithms DPLCLIP --datasets PACS --test_envs [0] --n_hparams_from 0 --n_hparams 4 --skip_confirmation`). 
-</div></details>
 
 ## Main difference in DPLCLIP from the [T3A implementation](https://github.com/matsuolab/T3A).
 1. The main code of algorithm is in `domainbed/algorithms.py`. 
@@ -98,7 +112,6 @@ class CLIP(Algorithm):
 <details><summary>Implement DPL for CLIP in DomainBed</summary><div>
 
 ```python
-# rename to DPL (Domain Prompt Learning)
 class DPLCLIP(CLIP):
     def __init__(self, input_shape, num_classes, num_domains, hparams, sentence_prompt=False):
         super(DPLCLIP, self).__init__(input_shape, num_classes, num_domains, hparams)
@@ -137,6 +150,7 @@ class DPLCLIP(CLIP):
         
         self.network.apply(init_weights)
         
+        # 
         self.optimizer = torch.optim.SGD(
             self.network.parameters(),
             lr=self.hparams["lr"],
@@ -144,26 +158,33 @@ class DPLCLIP(CLIP):
         )
             
     def update(self, minibatches, unlabeled=None):
+        # train on three domains, test on one unseen doamin on PACS.
         # minibatches = [[domain_1], [domain_2], [domain_3]]
         all_x = [data[0].cuda().float() for data in minibatches]
         all_y = torch.cat([data[1].cuda().long() for data in minibatches])
 
-        #  encode image for each domain.
+        # encode image for each domain.
         image_features = [self.clip_model.encode_image(x) for x in all_x]
         
-        #  extract domain_feature for each domain. [32, self.EMBEDDING_DIM] -> [32, self.EMBEDDING_DIM * num_domain_tokens] -> [self.EMBEDDING_DIM * num_domain_tokens].
+        # extract domain_feature for each domain. 
+        # [32, self.EMBEDDING_DIM] -> [32, self.EMBEDDING_DIM * num_domain_tokens] -> [self.EMBEDDING_DIM * num_domain_tokens].
         domain_features = [self.network(feature) for feature in image_features]
         image_features = torch.cat(image_features)
-        #  reshape [self.batch_size, self.EMBEDDING_DIM.]:  -> [1, self.EMBEDDING_DIM.]
+        
+        # get the domain feature!
+        # reshape [self.batch_size, self.EMBEDDING_DIM.]:  -> [1, self.EMBEDDING_DIM.]
         mean_domain_features = [feature.mean(dim=0, keepdim=True) for feature in domain_features]
 
-        #  reshape [1, self.EMBEDDING_DIM.]:  -> [7, self.EMBEDDING_DIM.]
+        # copy domain feature {the num of classes} times.
+        # reshape [1, self.EMBEDDING_DIM.]:  -> [7, self.EMBEDDING_DIM.]
         _mean_domain_features = [feature.repeat_interleave(len(self.hparams['class_names']), dim=0) for feature in mean_domain_features]
         
-        #  generate text_feature from domain_feature. text_features.size = [3, 7, 512]
+        # Generate domain prompt.
+        # generate text_feature from domain_feature. text_features.size = [3, 7, 512]
         # text_features = [self._get_text_features(feature) for feature in _mean_domain_features]
         text_features = torch.cat([self._get_text_features(feature) for feature in _mean_domain_features])
-            
+        
+        # Contrastive prediction. refer to [github://openai/clip](https://github.com/openai/CLIP)
         image_features = image_features / image_features.norm(dim=-1, keepdim=True)
         text_features = text_features / text_features.norm(dim=-1, keepdim=True)
         logits_per_image = self.clip_model.logit_scale.exp() * image_features @ text_features.t()
@@ -177,17 +198,18 @@ class DPLCLIP(CLIP):
 
     def _get_text_features(self, domain_feature, coop=False):
         #  reshape domain_feature: [7, 16 * self.EMBEDDING_DIM] -> [7, 16, self.EMBEDDING_DIM]
-        if coop:
-            domain_feature = domain_feature.unsqueeze(0).expand(len(self.hparams['class_names']), -1, -1)
         domain_feature = domain_feature.reshape(-1, self.hparams['num_domain_tokens'], self.EMBEDDING_DIM)
+        
         #  reshape domain_feature: [7, 16, self.EMBEDDING_DIM] -> [7, 77, self.EMBEDDING_DIM]
         domain_feature = torch.cat([self.token_prefix, domain_feature, self.token_suffix], dim=1)
+        
         #  refer CoOp: CoOP github. https://github.com/KaiyangZhou/CoOp/blob/b0a058869cef00a4e4ea5256d40fd7681119c099/trainers/coop.py#L46
         x = domain_feature + self.clip_model.positional_embedding.type(self.clip_model.dtype)
         x = x.permute(1, 0, 2)
         x = self.clip_model.transformer(x)
         x = x.permute(1, 0, 2)
         x = self.clip_model.ln_final(x).type(self.clip_model.dtype)
+        
         #  mapping domain_features to text_features.
         text_features = x[torch.arange(x.shape[0]), self.tokenized_prompts.argmax(dim=-1)] @ self.clip_model.text_projection      
         return text_features
@@ -204,6 +226,28 @@ class DPLCLIP(CLIP):
         return self.clip_model.logit_scale.exp() * image_feature @ text_feature.t()
 
 ```
+</div></details>
+
+<details><summary>The hyperparameters.</summary><div>
+
+The new parameters we added to DomainBed `hparams_registry.py`
+
+```python
+# the better num_domain_tokens should be 16 (refer to CoOp).
+_hparam('num_domain_tokens', 16, lambda r: int(r.choice([2, 4, 8, 16])))
+
+# MLP
+_hparam('mlp_depth', 3, lambda r: int(r.choice([3])))
+_hparam('mlp_width', 512, lambda r: int(r.choice([256, 512])))
+_hparam('mlp_dropout', 0.1, lambda r: r.choice([0.0, 0.1]))
+
+# optimizer
+_hparam('lr', 1e-3, lambda r: 10**r.uniform(-4.5, -2.5))
+_hparam('weight_decay', 0., lambda r: 0.)
+_hparam('momentum', 0.1, lambda r: r.choice([0.0, 0.1, 0.2]))
+
+```
+
 </div></details>
 
 ## License

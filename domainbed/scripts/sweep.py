@@ -268,14 +268,14 @@ if __name__ == "__main__":
     parser.add_argument('--datasets', nargs='+', type=str, default=DATASETS)
     parser.add_argument('--algorithms', nargs='+', type=str, default=algorithms.ALGORITHMS)
     parser.add_argument('--task', type=str, default="domain_generalization")
-    parser.add_argument('--n_hparams_from', type=int, required=True)
+    parser.add_argument('--n_hparams_from', type=int, required=0)
     parser.add_argument('--n_hparams', type=int, default=20)
     parser.add_argument('--output_dir', type=str, required=True)
     parser.add_argument('--data_dir', type=str, required=True)
     parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--n_trials_from', type=int, default=3)
-    parser.add_argument('--n_trials', type=int, default=3)
-    parser.add_argument('--command_launcher', type=str, required=True)
+    parser.add_argument('--n_trials_from', type=int, default=0)
+    parser.add_argument('--n_trials', type=int, default=0)
+    parser.add_argument('--command_launcher', type=str, required="multi_gpu")
     parser.add_argument('--steps', type=int, default=None)
     parser.add_argument('--hparams', type=str, default=None)
     parser.add_argument('--holdout_fraction', type=float, default=0.2)
@@ -353,26 +353,13 @@ if __name__ == "__main__":
             'T3A',
             'SHOT', 'PseudoLabel'
             'TentClf', 'SHOTIM', 'PLClf',
-            # 'PseudoLabel',  'SHOT', 'TentPreBN', 
-            # 'TentNorm',  'TentFull'
         ]
-        # methods = [
-        #     'T3A', 'TentFull', 'TentNorm', 'TentPreBN','TentClf', 
-        #     'PseudoLabel', 'PLClf', 'SHOT', 'SHOTIM'
-        #     ]
         jobs = []
         for method in methods:
             jobs += [UAJob(
                 train_args, args.output_dir,
-                adapt_algorithm='{}-{}'.format(method, '64'))  # set to the same as DPLCLIP. 
+                adapt_algorithm='{}-{}'.format(method, '64'))
                 for train_args in args_list]
-            # jobs += [UAJob(
-            #     train_args, args.output_dir,
-            #     adapt_algorithm=method) for train_args in args_list]
-            # jobs += [UAJob(
-            #     train_args, args.output_dir,
-            #     adapt_algorithm='{}-{}'.format(method, '200'))
-            #     for train_args in args_list]
 
         for job in jobs:
             print(job)

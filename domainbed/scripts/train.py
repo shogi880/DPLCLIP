@@ -89,14 +89,6 @@ if __name__ == "__main__":
 
     hparams['test_envs'] = [int(i) for i in args.test_envs]
 
-    # "RN50",
-    # "RN101",
-    # "RN50x4",
-    # "RN50x16",
-    # "RN50x64",
-    # "ViT-B/32",
-    # "ViT-B/16",
-    # "ViT-L/14",
     hparams['clip_transform'] = hparams['backbone'] == 'clip'
 
     print('HParams:')
