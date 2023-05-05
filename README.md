@@ -270,6 +270,30 @@ _hparam('momentum', 0.1, lambda r: r.choice([0.0, 0.1, 0.2]))
 ```
 
 </div></details>
+# Acknowledgement
+* Thanks for open-sourse codebase from T3A.
+    ```
+@article{iwasawa2021test,
+  title={Test-time classifier adjustment module for model-agnostic domain generalization},
+  author={Iwasawa, Yusuke and Matsuo, Yutaka},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  pages={2427--2440},
+  year={2021}
+}
+    ```
+
+* If you found this repo is useful, please cite us.
+    ```
+@article{zhang2021domain,
+  title={Domain Prompt Learning for Efficiently Adapting CLIP to Unseen Domains},
+  author={Zhang, Xin and Gu, Shixiang Shane and Matsuo, Yutaka and Iwasawa, Yusuke},
+  journal={arXiv e-prints},
+  pages={arXiv--2111},
+  year={2021}
+}
+    ```
+
 
 ## License
 
